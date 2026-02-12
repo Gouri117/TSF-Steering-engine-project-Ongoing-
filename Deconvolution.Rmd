@@ -1,0 +1,125 @@
+---
+title: "Deconvolution"
+output: html_document
+date: "2025-12-06"
+---
+
+# Load libraries
+```{r}
+library(Seurat)
+library(InstaPrism)
+library(Matrix)
+library(dplyr)
+```
+
+# Load bulk RNA-Seq data
+```{r}
+#first column is gene symbols
+bulk_expr <- read.csv(
+  "/nfs/turbo/umms-ukarvind/gouri/New_project/bulk_rna.csv",
+  row.names = 1,
+  check.names = FALSE
+)
+
+bulk_expr <- as.matrix(bulk_expr)
+```
+
+```{r}
+dim(bulk_expr)
+head(rownames(bulk_expr))
+head(colnames(bulk_expr))
+```
+
+
+# Load and preprocess the scRNA-Seq data
+```{r}
+sc_data <- readRDS("/nfs/turbo/umms-ukarvind/gouri/New_project/combined_10x_mixed_scRNAseq.rds")
+
+
+# expression matrix: genes x cells, counts or CPM
+scExpr <- as.matrix(GetAssayData(sc_data, assay = "RNA", layer = "counts"))
+
+# cell type and state labels from metadata
+cell_type_labels  <- sc_data@meta.data$majorlabel
+cell_state_labels <- sc_data@meta.data$minorlabel
+```
+
+```{r}
+dim(scExpr)
+head(rownames(scExpr))
+head(colnames(scExpr))
+```
+
+
+```{r}
+head(sc_data@meta.data[, c("majorlabel", "minorlabel")])
+table(sc_data$majorlabel)
+
+```
+
+# Create the ref_obj
+```{r}
+ref_obj <- refPrepare(
+  sc_Expr           = scExpr,
+  cell.type.labels  = sc_data$majorlabel,
+  cell.state.labels = sc_data$minorlabel
+)
+```
+
+# Run Deconvolution
+```{r}
+deconv_res <- InstaPrism(
+  bulk_Expr = bulk_expr,
+  refPhi_cs = ref_obj
+)
+```
+
+# Look at results
+```{r}
+estimated_frac = t(deconv_res@Post.ini.ct@theta)
+head(estimated_frac)
+```
+
+# Create Cell fraction matrix: sample x cell type
+```{r}
+# matrix: samples in rows, cell types in columns
+cell_fractions <- t(deconv_res@Post.ini.ct@theta)
+
+# quick check
+dim(cell_fractions)
+head(cell_fractions[, 1:5])
+
+# write to file
+write.csv(
+  cell_fractions,
+  file = "/nfs/turbo/umms-ukarvind/gouri/New_project/instaprism_cell_fractions.csv",
+  quote = FALSE
+)
+
+```
+
+
+# Create Cell-type specific gene expression matrix: sample x cell type x gene
+```{r}
+Z <- get_Z_array(deconv_res)
+dim(Z)
+str(dimnames(Z))
+```
+
+```{r}
+# reorder dimensions to: sample x cell_type x gene
+Z_sct <- aperm(Z, c(1, 3, 2))
+
+dim(Z_sct)          # should be n_sample, n_cell_type, n_gene
+# dimnames(Z_sct)[1]  # samples
+# dimnames(Z_sct)[2]  # cell types
+# dimnames(Z_sct)[3]  # genes
+```
+
+```{r}
+# saving as .rds as the file size is too large
+saveRDS(
+  Z_sct,
+  file = "/nfs/turbo/umms-ukarvind/gouri/New_project/instaprism_Z_sample_celltype_gene.rds"
+)
+```

@@ -1,0 +1,170 @@
+
+```{r}
+############################################
+## 1 Load packages and deconvolution output
+############################################
+library(CellChat)
+library(dplyr)
+library(igraph)
+```
+
+```{r}
+# Deconvolution results from InstaPrism
+cell_fractions <- read.csv(
+  "/nfs/turbo/umms-ukarvind/gouri/New_project/instaprism_cell_fractions.csv",
+  row.names = 1,
+  check.names = FALSE
+)
+
+Z_sct <- readRDS(
+  "/nfs/turbo/umms-ukarvind/gouri/New_project/instaprism_Z_sample_celltype_gene.rds"
+)
+
+samples    <- dimnames(Z_sct)[[1]]
+cell_types <- dimnames(Z_sct)[[2]]
+genes      <- dimnames(Z_sct)[[3]]
+
+cell_fractions <- as.matrix(cell_fractions)
+cell_fractions <- cell_fractions[samples, cell_types, drop = FALSE]
+```
+
+```{r}
+############################################
+## 2 Load CellChat LR database and complex info
+############################################
+data(CellChatDB.human)
+
+lr_raw      <- CellChatDB.human$interaction
+complex_tbl <- CellChatDB.human$complex
+
+```
+
+
+```{r}
+############################################
+## 3 Helper to map receptor name -> subunit genes
+############################################
+get_receptor_subunits <- function(receptor) {
+  if (!grepl("_", receptor)) {
+    return(receptor)                 # single gene receptor
+  }
+
+  if (receptor %in% rownames(complex_tbl)) {
+    subs <- complex_tbl[receptor, ]
+    subs <- subs[subs != "" & !is.na(subs)]
+    return(as.character(subs))
+  }
+
+  # fallback: split on underscore
+  return(strsplit(receptor, "_")[[1]])
+}
+```
+
+```{r}
+############################################
+## 4 Build ligand and receptor gene sets
+############################################
+lr_expanded <- lr_raw %>%
+  select(ligand, receptor) %>%
+  distinct() %>%
+  mutate(
+    ligand_genes   = lapply(ligand,  function(x) x),
+    receptor_genes = lapply(receptor, function(x) get_receptor_subunits(x))
+  )
+
+# keep only pairs where all needed genes exist in Z_sct
+lr_use <- lr_expanded %>%
+  filter(
+    sapply(ligand_genes,   function(x) all(x %in% genes)),
+    sapply(receptor_genes, function(x) all(x %in% genes))
+  )
+```
+
+```{r}
+############################################
+## 5 Precompute indices for ligands and receptor subunits
+############################################
+lig_idx_vec <- sapply(lr_use$ligand_genes, function(g) match(g, genes))
+
+rec_idx_list <- lapply(lr_use$receptor_genes, function(gs) match(gs, genes))
+```
+
+```{r}
+############################################
+## 6 Helper to compute complex expression across cell types
+############################################
+compute_complex_expr_all <- function(expr_ct_gene, idx_vec) {
+  # expr_ct_gene: cell_type x gene
+  # idx_vec: indices of subunits
+  apply(expr_ct_gene[, idx_vec, drop = FALSE], 1, min)
+}
+```
+
+```{r}
+############################################
+## 7 Main loop: sample wise CCN weights
+############################################
+res_list <- list()
+counter  <- 1L
+
+for (s in seq_along(samples)) {
+
+  sample_name  <- samples[s]
+  expr_ct_gene <- as.matrix(Z_sct[s, , ])    # cell_type x gene
+  frac_vec     <- cell_fractions[s, ]       # cell_type fractions
+
+  n_ct <- nrow(expr_ct_gene)
+  n_lr <- nrow(lr_use)
+
+  # ligand expression for all cell types and LR pairs
+  lig_mat <- expr_ct_gene[, lig_idx_vec, drop = FALSE]
+  rownames(lig_mat) <- cell_types
+
+  # receptor complex expression for all cell types and LR pairs
+  rec_mat <- matrix(NA_real_, n_ct, n_lr, dimnames = list(cell_types, NULL))
+  for (k in seq_len(n_lr)) {
+    rec_mat[, k] <- compute_complex_expr_all(expr_ct_gene, rec_idx_list[[k]])
+  }
+
+  # accumulate sender -> receiver weights
+  for (i in seq_along(cell_types)) {
+    sender      <- cell_types[i]
+    sender_frac <- frac_vec[i]
+
+    for (j in seq_along(cell_types)) {
+      receiver      <- cell_types[j]
+      receiver_frac <- frac_vec[j]
+
+      lr_vec    <- lig_mat[i, ] * rec_mat[j, ]
+      weight_ij <- sender_frac * receiver_frac * sum(lr_vec, na.rm = TRUE)
+
+      res_list[[counter]] <- data.frame(
+        sample   = sample_name,
+        sender   = sender,
+        receiver = receiver,
+        weight   = weight_ij,
+        stringsAsFactors = FALSE
+      )
+
+      counter <- counter + 1L
+    }
+  }
+}
+
+pair_strength <- bind_rows(res_list)
+
+dim(pair_strength)
+head(pair_strength)
+```
+
+```{r}
+############################################
+## Save pair_strength
+############################################
+saveRDS(
+  pair_strength,
+  file = "/nfs/turbo/umms-ukarvind/gouri/New_project/pair_strength.rds"
+)
+
+
+```
