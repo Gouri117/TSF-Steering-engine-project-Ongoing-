@@ -48,25 +48,12 @@ Macrophages suppress T cells
 CAFs remodel the matrix
 B cells secrete cytokines
 etc.
-We represent communication using ligand–receptor (LR) interactions:
-
-[
-\text{Sender cell expressing ligand} ;; \to ;; \text{Receiver cell expressing receptor}
-]
 
 Example:
 
 CD8_Tcell (IFNG)  →  Tumor (IFNGR1)
 
 CAF (CXCL12)      →  T cell (CXCR4)
-
-For each interaction in a trusted LR database (OmniPath, CellChatDB, NicheNet), we compute an edge strength for each patient:
-
-[
-\text{Edge strength} =
-(\text{ligand expression}) \times (\text{receptor expression})
-\times (\text{sender fraction}) \times (\text{receiver fraction})
-]
 
 This creates a TME communication graph for each patient.
 
@@ -99,10 +86,6 @@ Because next we want to do information geometry, which works on probability dist
 
 For each patient, we take their TSF edge strengths and compute a normalized “TSF profile”:
 
-[
-\text{TSF probability vector} = \text{softmax(edge strengths)}
-]
-
 Now each patient sits at a point on a probability simplex.
 
 This lets us measure similarity/dissimilarity in a mathematically principled way.
@@ -114,10 +97,6 @@ We want to treat responders as defining the “target state” of the TME.
 6.1 Map each probability vector to the Fisher–Rao information manifold
 
 Mathematically, we transform each distribution using a square-root embedding:
-
-[
-p \mapsto \psi = \sqrt{p}
-]
 
 All patients now lie on the unit sphere.
 
@@ -160,10 +139,6 @@ STEP 8 — Rebuild the TME Graph Under the Drug
 
 Using the perturbed cell-type expression, we rebuild the LR edges:
 
-[
-\text{Perturbed edge strength} = (\text{ligand}) \times (\text{receptor}) \times (\text{fractions})
-]
-
 Then we:
 
 Extract TSF edges
@@ -178,17 +153,9 @@ We ask two questions:
 
 Measure: distance reduction under Fisher–Rao geometry
 
-[
-\Delta d = d_{\text{baseline}} - d_{\text{drug}}
-]
-
 9.2 Does the drug move in the correct direction in the tangent space?
 
 Measure: alignment of vectors
-
-[
-\text{alignment} = \cos\left( (v_{\text{drug}} - v_{\text{baseline}}),; -v_{\text{baseline}} \right)
-]
 
 A good drug has:
 
