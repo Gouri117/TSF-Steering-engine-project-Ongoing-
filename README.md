@@ -1,4 +1,4 @@
-A complete end-to-end reasoning walkthrough.
+# A complete end-to-end reasoning walkthrough.
 
 The purpose of this entire workflow is:
 
@@ -8,7 +8,7 @@ This is a TME network steering problem, not a classical gene-based biomarker pro
 
 Here’s the entire process, step-by-step.
 
-STEP 1 — Start With Bulk RNA-seq as the Only Input
+## STEP 1 — Start With Bulk RNA-seq as the Only Input
 
 Bulk RNA-seq is the simplest and most widely available data type.
 
@@ -22,14 +22,14 @@ response is driven by interactions between cell types (cell-cell communication)
 not just what is happening inside tumor cells
 Therefore, we need to unmix the bulk signal into biologically meaningful units.
 
-STEP 2 — Deconvolution: Split Bulk Data Into Cell Types
+## STEP 2 — Deconvolution: Split Bulk Data Into Cell Types
 
 We use a technique like BayesPrism or InstaPrism to answer two key questions:
 
-2.1 How much of each cell type is present in each patient?
+### 2.1 How much of each cell type is present in each patient?
 (e.g., CD8 T cells, NK cells, macrophages, CAFs)
 
-2.2 What is the expression profile of each cell type inside each patient?
+### 2.2 What is the expression profile of each cell type inside each patient?
 
 This gives us two core ingredients:
 
@@ -39,7 +39,7 @@ A cell-type–specific gene expression matrix:
 sample × cell type × gene
 Now each patient is represented as a structured multicellular ecosystem, not one giant mixture.
 
-STEP 3 — Build the Cell–Cell Communication Network
+### STEP 3 — Build the Cell–Cell Communication Network
 
 Response to immunotherapy is driven by communication between cell types:
 
@@ -59,7 +59,7 @@ This creates a TME communication graph for each patient.
 
 This is the data structure we will learn from.
 
-STEP 4 — Identify TSFs: The “Drivers” of Response
+## STEP 4 — Identify TSFs: The “Drivers” of Response
 
 From hundreds of possible LR edges, we want to find:
 
@@ -78,7 +78,7 @@ NK → Macrophage via TNF–TNFRSF1A
 CAF → T cell via CXCL12–CXCR4
 These TSFs become the axes of the patient’s TME state.
 
-STEP 5 — Convert TSFs to a Probability Distribution
+## STEP 5 — Convert TSFs to a Probability Distribution
 
 Why?
 
@@ -90,7 +90,7 @@ Now each patient sits at a point on a probability simplex.
 
 This lets us measure similarity/dissimilarity in a mathematically principled way.
 
-STEP 6 — Information Geometry: Define the “Responder Manifold”
+## STEP 6 — Information Geometry: Define the “Responder Manifold”
 
 We want to treat responders as defining the “target state” of the TME.
 
@@ -100,13 +100,13 @@ Mathematically, we transform each distribution using a square-root embedding:
 
 All patients now lie on the unit sphere.
 
-6.2 Compute the Riemannian (Fisher–Rao) mean of responders
+### 6.2 Compute the Riemannian (Fisher–Rao) mean of responders
 
 This mean represents:
 
 The ideal TSF profile a patient should move towards.
 
-6.3 Compute each patient’s tangent vector
+### 6.3 Compute each patient’s tangent vector
 
 This vector describes:
 
@@ -115,7 +115,7 @@ how far they are from responders
 in which direction they must move
 This is “disease state geometry.”
 
-STEP 7 — Foundation Models (CPA): Simulating Drug Effects
+### STEP 7 — Foundation Models (CPA): Simulating Drug Effects
 
 We want to know:
 
@@ -135,7 +135,7 @@ using its baseline expression
 specifying the drug and dose
 This yields new cell-type-specific expression profiles as if the patient had been treated.
 
-STEP 8 — Rebuild the TME Graph Under the Drug
+## STEP 8 — Rebuild the TME Graph Under the Drug
 
 Using the perturbed cell-type expression, we rebuild the LR edges:
 
@@ -145,15 +145,16 @@ Extract TSF edges
 Compute perturbed TSF probabilities
 Map to geometry again
 Compute new tangent vector
-STEP 9 — Evaluate “Steering Power” of Each Drug
+
+## STEP 9 — Evaluate “Steering Power” of Each Drug
 
 We ask two questions:
 
-9.1 Does the drug move the patient toward the responder manifold?
+### 9.1 Does the drug move the patient toward the responder manifold?
 
 Measure: distance reduction under Fisher–Rao geometry
 
-9.2 Does the drug move in the correct direction in the tangent space?
+### 9.2 Does the drug move in the correct direction in the tangent space?
 
 Measure: alignment of vectors
 
@@ -163,7 +164,7 @@ High alignment (correct direction)
 Large distance reduction (moves closer)
 These define the best drugs for steering that patient’s TME toward a responder-like state.
 
-STEP 10 — Personalized Drug Ranking
+## STEP 10 — Personalized Drug Ranking
 
 For each patient, you produce:
 
